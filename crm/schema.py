@@ -1,7 +1,8 @@
 # crm/schema.py
 import graphene
 from graphene_django import DjangoObjectType
-from .models import Customer, Product, Order
+from .models import Customer, Order
+from crm.models import Product
 import re
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -175,3 +176,30 @@ class Query(graphene.ObjectType):
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
 
+class ProductType(DjangoObjectType):
+    class Meta:
+        model = Product
+
+class UpdateLowStockProducts(graphene.Mutation):
+    class Arguments:
+        pass  # no arguments needed
+
+    success = graphene.String()
+    updated_products = graphene.List(ProductType)
+
+    def mutate(self, info):
+        low_stock_products = Product.objects.filter(stock__lt=10)
+        updated = []
+
+        for product in low_stock_products:
+            product.stock += 10  # simulate restocking
+            product.save()
+            updated.append(product)
+
+        return UpdateLowStockProducts(
+            success=f"{len(updated)} products updated successfully",
+            updated_products=updated
+        )
+
+class Mutation(graphene.ObjectType):
+    update_low_stock_products = UpdateLowStockProducts.Field()
